@@ -52,7 +52,7 @@ def create_dataframe(strings: list) -> dict:
         "$request_time",
     ]
 
-    data = [parse_log_line(line) for line in strings[:300000] if line]
+    data = [parse_log_line(line) for line in strings[:] if line]
 
     df = pd.DataFrame(data, columns=columns)
 
@@ -86,13 +86,43 @@ def truncate_string(text, max_length=30):
     return text[:max_length] + ("..." if len(text) > max_length else "")
 
 
+def load_config(config_path):
+    try:
+        with open(config_path, "r") as config_file:
+            file_config = json.load(config_file)
+        return file_config
+    except (json.JSONDecodeError, FileNotFoundError) as e:
+        print(f"Error loading config file: {e}")
+        exit(1)
+
+
 def main():
+    # config file reading
+    parser = argparse.ArgumentParser(
+        description="Script with configuration file support"
+    )
+    parser.add_argument(
+        "--config", help="Path to the configuration file", default="config.json"
+    )
+    args = parser.parse_args()
+
+    config_path = args.config
+
+    # if not os.path.exists(config_path):
+    #     print(f"Config file not found: {config_path}")
+    #     exit(1)
+
+    file_config = load_config(config_path)
+    config.update(file_config)
+
+    # log-file operations
     d = reader(config)
-
     frame = create_dataframe(d)
-
-    df1 = pd.DataFrame(frame).sort_values(by="time_sum", ascending=False).head(1000)
-
+    df1 = (
+        pd.DataFrame(frame)
+        .sort_values(by="time_sum", ascending=False)
+        .head(config.get("REPORT_SIZE"))
+    )
     # json is written to html-template report-template.html
     unparsed_json = json.loads(
         df1.reset_index()
@@ -103,13 +133,12 @@ def main():
     env = Environment(loader=FileSystemLoader("."))
     template = env.get_template("/static/html/report-template.html")
     rendered_html = template.render(json_data=json_data)
-
     # html-report creation
     try:
         with open(config.get("REPORT_DIR") + "/report.html", "w") as output_file:
             output_file.write(rendered_html)
     except FileNotFoundError:
-        os.mkdir(config.get("REPORT_DIR"))
+        os.makedirs(config.get("REPORT_DIR"))
         with open(config.get("REPORT_DIR") + "/report.html", "w") as output_file:
             output_file.write(rendered_html)
 
