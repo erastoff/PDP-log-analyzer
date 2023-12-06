@@ -1,33 +1,50 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# log_format ui_short '$remote_addr  $remote_user $http_x_real_ip [$time_local] "$request" '
+#                     '$status $body_bytes_sent "$http_referer" '
+#                     '"$http_user_agent" "$http_x_forwarded_for" "$http_X_REQUEST_ID" "$http_X_RB_USER" '
+#                     '$request_time';
+
 import argparse
 import datetime as DT
 import gzip
 import json
 import logging
 import os
-
 import re
+import sys
 
 import pandas as pd
 from jinja2 import Environment, FileSystemLoader
 
+# logging settings
 logging.basicConfig(
     level=logging.DEBUG,
     format="[%(asctime)s] %(levelname)s: %(message)s.",
     datefmt="%Y.%m.%d %H:%M:%S",
 )
 
-# log_format ui_short '$remote_addr  $remote_user $http_x_real_ip [$time_local] "$request" '
-#                     '$status $body_bytes_sent "$http_referer" '
-#                     '"$http_user_agent" "$http_x_forwarded_for" "$http_X_REQUEST_ID" "$http_X_RB_USER" '
-#                     '$request_time';
 
+# uncaught exceptions catching
+def handle_exception(exc_type, exc_value, exc_traceback):
+    logging.exception(
+        "Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback)
+    )
+
+
+sys.excepthook = handle_exception
+
+# default config
 config = {"REPORT_SIZE": 1000, "REPORT_DIR": "./reports", "LOG_DIR": "./log"}
 
 
 def reader(config: dict):
+    """
+    Function for reading baseline log file
+    :param config: dict
+    :return: data (readlines()), report name
+    """
     files = []
     log_prefix = "nginx-access-ui.log"
     date_pattern = re.compile(r"\d{8}")
@@ -37,7 +54,6 @@ def reader(config: dict):
             files.append(file)
     if not bool(files):
         logging.info("The are no files to parse")
-        # print("The are no files to parse!")
         exit(0)
 
     # file selection
@@ -68,7 +84,6 @@ def reader(config: dict):
         exit(0)
 
     # file opening
-    # if ".gz" in last_file:
     if last_file.endswith(".gz"):
         with gzip.open(
             config.get("LOG_DIR") + "/" + last_file, "rt", encoding="utf-8"
@@ -85,6 +100,11 @@ def reader(config: dict):
 
 
 def parse_log_line(line: str):
+    """
+    Function for single line parsing
+    :param line: str
+    :return: list of parsed data
+    """
     log_pattern = re.compile(
         r'^(\S+) (\S+)  (\S+) \[([^\]]+)\] "(\S+)\s?(\S+)?\s?(\S+)?" (\d+) (\d+) "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)" (\S+) (\S+)'
     )
@@ -96,6 +116,13 @@ def parse_log_line(line: str):
 
 
 def create_dataframe(strings: list) -> dict:
+    """
+    Summary DataFrame creation
+    :param strings: list
+    :return: dict
+    """
+    processed_treshold = 0.75
+    strings_num = len(strings)
     columns = [
         "$remote_addr",
         "$remote_user",
@@ -114,9 +141,15 @@ def create_dataframe(strings: list) -> dict:
         "$request_time",
     ]
 
-    data = [parse_log_line(line) for line in strings[:30000] if line]
-
-    df = pd.DataFrame(data, columns=columns)
+    data = [parse_log_line(line) for line in strings[:] if line]
+    data_len = len(list(filter(lambda x: x is not None, data)))
+    if data_len / strings_num > processed_treshold:
+        df = pd.DataFrame(data, columns=columns)
+    else:
+        logging.error(
+            f"Parsed lines below specified threshold - {round(data_len / strings_num * 100)}% parsed"
+        )
+        exit(1)
 
     df["$time_local"] = pd.to_datetime(df["$time_local"], format="%d/%b/%Y:%H:%M:%S %z")
     df["$request_time"] = pd.to_numeric(df["$request_time"])
@@ -149,6 +182,11 @@ def truncate_string(text, max_length=30):
 
 
 def load_config(config_path):
+    """
+    This function opens config file, read dict inside and return
+    :param config_path:
+    :return: dict
+    """
     try:
         with open(config_path, "r") as config_file:
             file_config = json.load(config_file)
@@ -169,10 +207,6 @@ def main():
     args = parser.parse_args()
 
     config_path = args.config
-
-    # if not os.path.exists(config_path):
-    #     print(f"Config file not found: {config_path}")
-    #     exit(1)
 
     file_config = load_config(config_path)
     config.update(file_config)
