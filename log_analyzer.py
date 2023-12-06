@@ -5,12 +5,19 @@ import argparse
 import datetime as DT
 import gzip
 import json
+import logging
 import os
 
 import re
 
 import pandas as pd
 from jinja2 import Environment, FileSystemLoader
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="[%(asctime)s] %(levelname)s: %(message)s.",
+    datefmt="%Y.%m.%d %H:%M:%S",
+)
 
 # log_format ui_short '$remote_addr  $remote_user $http_x_real_ip [$time_local] "$request" '
 #                     '$status $body_bytes_sent "$http_referer" '
@@ -29,7 +36,8 @@ def reader(config: dict):
         if log_prefix in file:
             files.append(file)
     if not bool(files):
-        print("The are no files to parse!")
+        logging.info("The are no files to parse")
+        # print("The are no files to parse!")
         exit(0)
 
     # file selection
@@ -44,19 +52,24 @@ def reader(config: dict):
                 last_file = name
                 last_date = dt
         else:
-            print(f"Incorrect data suffix in log name: '{name}'")
+            logging.info(f"Incorrect data suffix in log name: '{name}'")
             continue
     if last_date == DT.datetime.min:
-        print("The are no files to parse!")
+        logging.info("The are no files to parse")
         exit(0)
     # report file name generation and check its existence
     report_name = "report-" + last_date.strftime("%Y.%m.%d") + ".html"
-    if report_name in os.listdir(config.get("REPORT_DIR")):
-        print(f"Log file '{last_file}' has been already parsed!")
+    if os.path.isdir(config.get("REPORT_DIR")) and report_name in os.listdir(
+        config.get("REPORT_DIR")
+    ):
+        logging.info(
+            f"The last Log file '{last_file}' has been already parsed to '{report_name}'"
+        )
         exit(0)
 
     # file opening
-    if ".gz" in last_file:
+    # if ".gz" in last_file:
+    if last_file.endswith(".gz"):
         with gzip.open(
             config.get("LOG_DIR") + "/" + last_file, "rt", encoding="utf-8"
         ) as f:
@@ -141,8 +154,8 @@ def load_config(config_path):
             file_config = json.load(config_file)
         return file_config
     except (json.JSONDecodeError, FileNotFoundError) as e:
-        print(f"Error loading config file: {e}")
-        exit(1)
+        logging.exception(f"Error loading config file:\n {e}")
+        return {}
 
 
 def main():
@@ -188,10 +201,12 @@ def main():
     try:
         with open(config.get("REPORT_DIR") + "/" + report_name, "w") as output_file:
             output_file.write(rendered_html)
+        logging.info(f"File {report_name} has just been created")
     except FileNotFoundError:
         os.makedirs(config.get("REPORT_DIR"))
         with open(config.get("REPORT_DIR") + "/" + report_name, "w") as output_file:
             output_file.write(rendered_html)
+        logging.info(f"File {report_name} has just been created")
 
 
 if __name__ == "__main__":
