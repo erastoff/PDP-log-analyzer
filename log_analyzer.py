@@ -103,7 +103,7 @@ def parse_log_line(line: str):
     """
     Function for single line parsing
     :param line: str
-    :return: list of parsed data
+    :return: tuple of parsed data
     """
     log_pattern = re.compile(
         r'^(\S+) (\S+)  (\S+) \[([^\]]+)\] "(\S+)\s?(\S+)?\s?(\S+)?" (\d+) (\d+) "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)" (\S+) (\S+)'
@@ -115,7 +115,7 @@ def parse_log_line(line: str):
         return None
 
 
-def create_dataframe(strings: list) -> dict:
+def create_dataframe(strings: list) -> pd.DataFrame:
     """
     Summary DataFrame creation
     :param strings: list
@@ -143,6 +143,7 @@ def create_dataframe(strings: list) -> dict:
 
     data = [parse_log_line(line) for line in strings[:] if line]
     data_len = len(list(filter(lambda x: x is not None, data)))
+
     if data_len / strings_num > processed_treshold:
         df = pd.DataFrame(data, columns=columns)
     else:
@@ -166,15 +167,18 @@ def create_dataframe(strings: list) -> dict:
     time_max = df.groupby(by=["$request_path"])["$request_time"].max()
     time_med = df.groupby(by=["$request_path"])["$request_time"].median()
 
-    return {
-        "count": count,
-        "count_perc": count_perc,
-        "time_sum": time_sum,
-        "time_perc": time_perc,
-        "time_avg": time_avg,
-        "time_max": time_max,
-        "time_med": time_med,
-    }
+    df_new = pd.DataFrame(
+        {
+            "count": count,
+            "count_perc": count_perc,
+            "time_sum": time_sum,
+            "time_perc": time_perc,
+            "time_avg": time_avg,
+            "time_max": time_max,
+            "time_med": time_med,
+        }
+    )
+    return df_new
 
 
 def truncate_string(text, max_length=30):
@@ -214,10 +218,8 @@ def main():
     # log-file operations
     data, report_name = reader(config)
     frame = create_dataframe(data)
-    df1 = (
-        pd.DataFrame(frame)
-        .sort_values(by="time_sum", ascending=False)
-        .head(config.get("REPORT_SIZE"))
+    df1 = frame.sort_values(by="time_sum", ascending=False).head(
+        config.get("REPORT_SIZE")
     )
 
     # json is written to html-template report-template.html
