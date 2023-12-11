@@ -71,10 +71,7 @@ def card_suits(hand):
 def flush(hand):
     """Возвращает True, если все карты одной масти"""
     suits = card_suits(hand)
-    if suits.count(suits[0]) == len(suits):
-        return True
-    else:
-        return False
+    return len(set(suits)) == 1
 
 
 def straight(ranks):
