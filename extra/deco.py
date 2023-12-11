@@ -86,7 +86,7 @@ def n_ary(func):
     return wrapper
 
 
-def trace1(tracer: str):
+def trace(prefix):
     """Trace calls made to function decorated.
 
     @trace("____")
@@ -107,43 +107,6 @@ def trace1(tracer: str):
 
     """
 
-    def trasing_deco(func):
-        def reset():
-            wrapper.rdepth = 0
-            wrapper.ncalls = 0
-
-        @wraps(func)
-        def wrapper(*args):
-            if wrapper.depth == 0:
-                reset()
-            wrapper.depth += 1
-            wrapper.ncalls += 1
-            wrapper.rdepth = max(wrapper.rdepth, wrapper.depth)
-            print(tracer * (wrapper.depth - 1), end=" ")
-            print("-->", end=" ")
-            print(f"fib({args[0]})")
-            if args[0] in (0, 1):
-                print(tracer * (wrapper.depth - 1), end=" ")
-                print("<--", end=" ")
-                print(f"fib({args[0]}) == 1")
-            try:
-                return func(*args)
-            finally:
-                wrapper.depth -= 1
-                if args[0] not in (0, 1):
-                    print(tracer * (wrapper.depth), end=" ")
-                    print("<--", end=" ")
-                    print(f"fib({args[0]}) == ##")
-            # return func(*args)
-
-        wrapper.depth = 0
-        reset()
-        return wrapper
-
-    return trasing_deco
-
-
-def trace(prefix):
     def trasing_deco(func):
         def reset():
             wrapper.rdepth = 0
@@ -194,24 +157,6 @@ def bar(a, b):
 def fib(n):
     """Some doc"""
     return 1 if n <= 1 else fib(n - 1) + fib(n - 2)
-
-
-# @trace("++++++")
-
-
-# @memo
-# @trace("====")
-# @memo
-# @decorator
-# def fib(n):
-#     """Some doc"""
-#     return 1 if n <= 1 else fib(n - 1) + fib(n - 2)
-#
-#
-# # @countcalls
-# @memo
-# def foo(a, b):
-#     return a + b
 
 
 def main():
