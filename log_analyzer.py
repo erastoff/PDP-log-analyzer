@@ -92,18 +92,23 @@ def reader(config: dict):
         exit(0)
 
     # file opening
-    if last_file.endswith(".gz"):
-        with gzip.open(
-            config.get("LOG_DIR") + "/" + last_file, "rt", encoding="utf-8"
-        ) as f:
-            data = f.readlines()
-    else:
-        with open(
-            config.get("LOG_DIR") + "/" + last_file,
+    log_path = config.get("LOG_DIR") + "/" + last_file
+    opener = (
+        gzip.open(
+            log_path,
             "rt",
             encoding="utf-8",
-        ) as f:
-            data = f.readlines()
+        )
+        if last_file.endswith(".gz")
+        else open(
+            log_path,
+            "rt",
+            encoding="utf-8",
+        )
+    )
+    with opener as f:
+        data = f.readlines()
+
     return data, report_name
 
 
