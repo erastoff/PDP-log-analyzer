@@ -73,13 +73,13 @@ def reader(config: dict):
             files.append(file)
     if not bool(files):
         logging.info("The are no files to parse")
-        exit(0)
+        return None
 
     last_file, last_date = last_log_search(files, date_pattern)
 
     if last_date == DT.datetime.min:
         logging.info("The are no files to parse")
-        exit(0)
+        return None
 
     # report file name generation and check its existence
     report_name = "report-" + last_date.strftime("%Y.%m.%d") + ".html"
@@ -89,7 +89,7 @@ def reader(config: dict):
         logging.info(
             f"The last Log file '{last_file}' has been already parsed to '{report_name}'"
         )
-        exit(0)
+        return None
 
     # file opening
     log_path = config.get("LOG_DIR") + "/" + last_file
@@ -163,7 +163,7 @@ def create_dataframe(strings: list) -> pd.DataFrame:
         logging.error(
             f"Parsed lines below specified threshold - {round(data_len / strings_num * 100)}% parsed"
         )
-        exit(1)
+        return None
 
     df["$time_local"] = pd.to_datetime(df["$time_local"], format="%d/%b/%Y:%H:%M:%S %z")
     df["$request_time"] = pd.to_numeric(df["$request_time"])
@@ -229,8 +229,15 @@ def main():
     config.update(file_config)
 
     # log-file operations
-    data, report_name = reader(config)
+    reading = reader(config)
+    if reading is None:
+        exit(0)
+    else:
+        data, report_name = reading
     frame = create_dataframe(data)
+    if frame is None:
+        exit(1)
+
     df1 = frame.sort_values(by="time_sum", ascending=False).head(
         config.get("REPORT_SIZE")
     )
