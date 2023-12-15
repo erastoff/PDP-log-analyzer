@@ -39,24 +39,7 @@ sys.excepthook = handle_exception
 config = {"REPORT_SIZE": 1000, "REPORT_DIR": "./reports", "LOG_DIR": "./log"}
 
 
-def reader(config: dict):
-    """
-    Function for reading baseline log file
-    :param config: dict
-    :return: data (readlines()), report name
-    """
-    files = []
-    log_prefix = "nginx-access-ui.log"
-    date_pattern = re.compile(r"\d{8}")
-    # get file names in LOG_DIR
-    for file in os.listdir(config.get("LOG_DIR")):
-        if log_prefix in file:
-            files.append(file)
-    if not bool(files):
-        logging.info("The are no files to parse")
-        exit(0)
-
-    # file selection
+def last_log_search(files: list, date_pattern: re.Pattern):
     last_file = files[0]  # initial file name
     last_date = DT.datetime.min  # initial file date
     for name in files:
@@ -70,9 +53,34 @@ def reader(config: dict):
         else:
             logging.info(f"Incorrect data suffix in log name: '{name}'")
             continue
+    return last_file, last_date
+
+
+def reader(config: dict):
+    """
+    Function for reading baseline log file
+    :param config: dict
+    :return: data (readlines()), report name
+    """
+    files = []
+    log_prefix = "nginx-access-ui.log"
+    date_pattern = re.compile(r"\d{8}")
+
+    # get file names in LOG_DIR
+
+    for file in os.listdir(config.get("LOG_DIR")):
+        if log_prefix in file:
+            files.append(file)
+    if not bool(files):
+        logging.info("The are no files to parse")
+        exit(0)
+
+    last_file, last_date = last_log_search(files, date_pattern)
+
     if last_date == DT.datetime.min:
         logging.info("The are no files to parse")
         exit(0)
+
     # report file name generation and check its existence
     report_name = "report-" + last_date.strftime("%Y.%m.%d") + ".html"
     if os.path.isdir(config.get("REPORT_DIR")) and report_name in os.listdir(
