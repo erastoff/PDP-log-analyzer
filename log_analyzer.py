@@ -124,8 +124,6 @@ def parse_log_line(line: str):
     match = log_pattern.match(line)
     if match:
         return match.groups()
-    else:
-        return None
 
 
 def create_dataframe(strings: list) -> pd.DataFrame:
@@ -213,6 +211,19 @@ def load_config(config_path):
         return {}
 
 
+def create_report(config, report_name, rendered_html):
+    html_path = config.get("REPORT_DIR") + "/" + report_name
+    try:
+        with open(html_path, "w") as output_file:
+            output_file.write(rendered_html)
+        logging.info(f"File {report_name} has just been created")
+    except FileNotFoundError:
+        os.makedirs(config.get("REPORT_DIR"))
+        with open(html_path, "w") as output_file:
+            output_file.write(rendered_html)
+        logging.info(f"File {report_name} has just been created")
+
+
 def main():
     # config file reading
     parser = argparse.ArgumentParser(
@@ -254,15 +265,7 @@ def main():
     rendered_html = template.render(json_data=json_data)
 
     # html-report creation
-    try:
-        with open(config.get("REPORT_DIR") + "/" + report_name, "w") as output_file:
-            output_file.write(rendered_html)
-        logging.info(f"File {report_name} has just been created")
-    except FileNotFoundError:
-        os.makedirs(config.get("REPORT_DIR"))
-        with open(config.get("REPORT_DIR") + "/" + report_name, "w") as output_file:
-            output_file.write(rendered_html)
-        logging.info(f"File {report_name} has just been created")
+    create_report(config, report_name, rendered_html)
 
 
 if __name__ == "__main__":
