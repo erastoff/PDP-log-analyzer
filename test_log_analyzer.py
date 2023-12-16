@@ -3,10 +3,8 @@ import pandas as pd
 
 
 from log_analyzer import (
-    reader,
     parse_log_line,
     create_dataframe,
-    load_config,
 )
 
 
